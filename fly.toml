@@ -1,0 +1,20 @@
+[app]
+  http_service = { inner_path = "/docs", force_https = true }
+
+[[services]]
+  http_port = 8000
+  internal_port = 8000
+  protocol = "tcp"
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 8000
+
+  [[services.tcp_checks]]
+    interval = "10s"
+    timeout = "2s"
