@@ -1,6 +1,6 @@
 import sys
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response
 
 APP_DIR = '/home/chanpuirider/szcb-market-api'
 sys.path.insert(0, APP_DIR)
@@ -8,7 +8,14 @@ os.chdir(APP_DIR)
 
 app = Flask(__name__)
 
-# 簡單的硬編碼數據 - 立即返回
+# 添加 CORS 頭
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 STOCK_DATA = {
     "hsi": {"price": 22500.50, "previous_close": 22230.00, "percent": 1.22},
     "dji": {"price": 38000.00, "previous_close": 37700.00, "percent": 0.80},
@@ -27,11 +34,15 @@ FX_DATA = {
 
 @app.route('/api/stocks')
 def stocks():
-    return jsonify(STOCK_DATA)
+    response = make_response(jsonify(STOCK_DATA))
+    response.headers['Content-Type'] = 'application/json;charset=utf-8'
+    return response
 
 @app.route('/api/fx-rates')
 def fx_rates():
-    return jsonify(FX_DATA)
+    response = make_response(jsonify(FX_DATA))
+    response.headers['Content-Type'] = 'application/json;charset=utf-8'
+    return response
 
 @app.route('/health')
 def health():
