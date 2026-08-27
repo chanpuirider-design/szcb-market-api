@@ -4,7 +4,7 @@ SHCB Market Data API - FastAPI + Yahoo Finance (PythonAnywhere WSGI 兼容版本
 
 import sys
 import os
-from flask import Flask, jsonify, request as flask_request
+from flask import Flask, jsonify
 
 # 配置應用目錄
 APP_DIR = '/home/chanpuirider/szcb-market-api'
@@ -14,23 +14,15 @@ os.chdir(APP_DIR)
 # 創建 Flask 應用
 app = Flask(__name__)
 
-# 導入 FastAPI 應用
-from main import app as fastapi_app
+# 導入 FastAPI 應用和函數
+from main import get_stocks, get_fx_rates, health_check
 
-# 註冊路由 - 直接調用 FastAPI 路由
+# 註冊路由
 @app.route('/api/stocks')
 def stocks():
     """獲取股票數據"""
     try:
-        # 創建臨時請求
-        import json
-        data = {
-            "HSI": {"price": 22500.50, "change": "+1.2%"},
-            "DJI": {"price": 38000.00, "change": "+0.8%"},
-            "SPX": {"price": 5200.00, "change": "+0.5%"},
-            "IXIC": {"price": 16500.00, "change": "+1.0%"},
-            "SSE": {"price": 3200.00, "change": "+0.3%"}
-        }
+        data = get_stocks()
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -39,13 +31,7 @@ def stocks():
 def fx_rates():
     """獲取匯率數據"""
     try:
-        data = {
-            "USD/HKD": 7.82,
-            "EUR/HKD": 8.50,
-            "GBP/HKD": 9.90,
-            "JPY/HKD": 0.052,
-            "CNY/HKD": 1.07
-        }
+        data = get_fx_rates()
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -54,12 +40,8 @@ def fx_rates():
 def yahoo_ticker(ticker):
     """獲取單一股票數據"""
     try:
-        data = {
-            "ticker": ticker,
-            "price": 100.00,
-            "change": "+1.0%",
-            "market": "HK"
-        }
+        from main import get_yahoo_data
+        data = get_yahoo_data(ticker)
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -67,10 +49,11 @@ def yahoo_ticker(ticker):
 @app.route('/health')
 def health():
     """健康檢查"""
-    return jsonify({
-        "status": "healthy",
-        "service": "shcb-market-api"
-    })
+    try:
+        data = health_check()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 @app.route('/docs')
