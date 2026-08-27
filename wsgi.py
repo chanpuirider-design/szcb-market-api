@@ -34,6 +34,7 @@ def stocks():
                     
                     result[name.lower()] = {
                         'price': round(close, 2),
+                        'previous_close': round(prev_close, 2),
                         'percent': round(((close - prev_close) / prev_close) * 100, 2) if prev_close else 0
                     }
             except Exception as e:
@@ -69,6 +70,7 @@ def fx_rates():
                     
                     result[name.lower()] = {
                         'price': round(close, 2),
+                        'previous_close': round(prev_close, 2),
                         'percent': round(((close - prev_close) / prev_close) * 100, 2) if prev_close else 0
                     }
             except Exception as e:
