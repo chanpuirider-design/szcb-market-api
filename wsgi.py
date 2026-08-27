@@ -1,27 +1,56 @@
 import sys
 import os
+import json
+import urllib.request
+import urllib.error
+from flask import Flask, jsonify, make_response
 
-# 確保使用虛擬環境
 APP_DIR = '/home/chanpuirider/szcb-market-api'
 sys.path.insert(0, APP_DIR)
 os.chdir(APP_DIR)
 
-print(f"[INIT] Python: {sys.executable}", file=sys.stderr)
-print(f"[INIT] Version: {sys.version}", file=sys.stderr)
-print(f"[INIT] CWD: {os.getcwd()}", file=sys.stderr)
-
-# 測試 yfinance
-try:
-    import yfinance as yf
-    print(f"[OK] yfinance {yf.__version__} from: {yf.__file__}", file=sys.stderr)
-except Exception as e:
-    print(f"[ERROR] yfinance import failed: {e}", file=sys.stderr)
-    yf = None
-
-from flask import Flask, jsonify, make_response
-
 app = Flask(__name__)
 
+# 直接使用 Yahoo Finance API
+def fetch_yahoo_data(symbol, period="5d"):
+    """直接使用 Yahoo Finance API 獲取數據"""
+    try:
+        # Yahoo Finance API endpoint
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={int(os.time())-86400*2}&period2={int(os.time())}&interval=1d"
+        
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        )
+        
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode())
+            
+            if 'chart' in data and data['chart']['result']:
+                result = data['chart']['result'][0]
+                timestamps = result['timestamp']
+                closes = result['indicators']['quote'][0]['close']
+                
+                # 過濾掉 None 值
+                closes = [c for c in closes if c is not None]
+                
+                if len(closes) >= 2:
+                    current = closes[-1]
+                    prev_close = closes[-2]
+                    percent = ((current - prev_close) / prev_close) * 100
+                    return {
+                        "price": round(current, 2),
+                        "previous_close": round(prev_close, 2),
+                        "percent": round(percent, 2)
+                    }
+    except Exception as e:
+        print(f"[ERROR] {symbol}: {e}", file=sys.stderr)
+    
+    return None
+
+# 股票代碼
 STOCK_TICKERS = {
     "hsi": "^HSI",
     "dji": "^DJI",
@@ -30,48 +59,37 @@ STOCK_TICKERS = {
     "sse": "000001.SS"
 }
 
+# 外匯代碼
 FX_TICKERS = {
     "usd": "USDHKD=X",
     "eur": "EURHKD=X",
     "gbp": "GBPUSD=X",
     "jpy": "JPYHKD=X",
-    "cny": "CNHHKD=X"
+    "cny": "CNYHKD=X"
 }
 
 def get_stock_data():
-    global yf
-    if yf is None:
-        return {}
+    """獲取股票數據"""
     data = {}
-    for key, ticker in STOCK_TICKERS.items():
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="5d", timeout=30)
-            if not hist.empty and len(hist) >= 2:
-                current = hist['Close'].iloc[-1]
-                prev_close = hist['Close'].iloc[-2]
-                percent = ((current - prev_close) / prev_close) * 100
-                data[key] = {"price": round(current, 2), "previous_close": round(prev_close, 2), "percent": round(percent, 2)}
-        except Exception as e:
-            print(f"[ERROR] {key}: {e}", file=sys.stderr)
+    for key, symbol in STOCK_TICKERS.items():
+        result = fetch_yahoo_data(symbol)
+        if result:
+            data[key] = result
+            print(f"[OK] {key}: {result['price']}", file=sys.stderr)
+        else:
+            print(f"[WARN] {key}: 無法獲取數據", file=sys.stderr)
     return data
 
 def get_fx_data():
-    global yf
-    if yf is None:
-        return {}
+    """獲取外匯數據"""
     data = {}
-    for key, ticker in FX_TICKERS.items():
-        try:
-            forex = yf.Ticker(ticker)
-            hist = forex.history(period="5d", timeout=30)
-            if not hist.empty and len(hist) >= 2:
-                current = hist['Close'].iloc[-1]
-                prev_close = hist['Close'].iloc[-2]
-                percent = ((current - prev_close) / prev_close) * 100
-                data[key] = {"price": round(current, 4), "previous_close": round(prev_close, 4), "percent": round(percent, 2)}
-        except Exception as e:
-            print(f"[ERROR] {key}: {e}", file=sys.stderr)
+    for key, symbol in FX_TICKERS.items():
+        result = fetch_yahoo_data(symbol)
+        if result:
+            data[key] = result
+            print(f"[OK] {key}: {result['price']}", file=sys.stderr)
+        else:
+            print(f"[WARN] {key}: 無法獲取數據", file=sys.stderr)
     return data
 
 @app.after_request
@@ -101,29 +119,23 @@ def health():
 
 @app.route('/debug')
 def debug():
-    global yf
     results = {
-        "python_executable": sys.executable,
         "python_version": sys.version,
-        "yfinance_imported": yf is not None,
-        "yfinance_path": getattr(yf, '__file__', 'unknown'),
         "test_results": {}
     }
-    if yf is not None:
-        for ticker in ["^HSI", "USDHKD=X", "^DJI"]:
-            try:
-                t = yf.Ticker(ticker)
-                h = t.history(period="5d", timeout=30)
-                results["test_results"][ticker] = {
-                    "rows": len(h),
-                    "last_price": float(h['Close'].iloc[-1]) if not h.empty else None
-                }
-            except Exception as e:
-                results["test_results"][ticker] = {"error": str(e)}
+    
+    # 測試 Yahoo API
+    for symbol in ["^HSI", "USDHKD=X", "^DJI"]:
+        try:
+            result = fetch_yahoo_data(symbol)
+            results["test_results"][symbol] = result
+        except Exception as e:
+            results["test_results"][symbol] = {"error": str(e)}
+    
     return jsonify(results)
 
 @app.route('/')
 def index():
-    return jsonify({"message": "SHCB Market Data API v4.3"})
+    return jsonify({"message": "SHCB Market Data API v5.0", "data_source": "Yahoo Finance API"})
 
 application = app
