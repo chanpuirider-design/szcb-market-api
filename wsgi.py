@@ -43,7 +43,9 @@ def fetch_yahoo_data(symbol, period="5d"):
                     return {
                         "price": round(current, 3),
                         "previous_close": round(prev_close, 3),
-                        "percent": round(percent, 2)
+                        "percent": round(percent, 2),
+                        "price_display": f"{current:.3f}",
+                        "previous_close_display": f"{prev_close:.3f}"
                     }
     except Exception as e:
         print(f"[ERROR] {symbol}: {e}", file=sys.stderr)
