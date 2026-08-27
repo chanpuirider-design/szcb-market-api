@@ -2,34 +2,79 @@ import sys
 import os
 from flask import Flask, jsonify
 
-# 配置應用目錄
 APP_DIR = '/home/chanpuirider/szcb-market-api'
 sys.path.insert(0, APP_DIR)
 os.chdir(APP_DIR)
 
-# 創建 Flask 應用
 app = Flask(__name__)
 
-# 簡單路由
 @app.route('/api/stocks')
 def stocks():
+    """獲取股票指數數據 - 返回與市場頁面兼容的格式"""
     try:
-        return jsonify({
-            "hsi": {"price": 22500.50, "change": "+1.2%"},
-            "dji": {"price": 38000.00, "change": "+0.8%"},
-            "spx": {"price": 5200.00, "change": "+0.5%"}
-        })
+        import yfinance as yf
+        
+        tickers = {
+            'HSI': '^HSI',
+            'DJI': '^DJI',
+            'SPX': '^GSPC',
+            'IXIC': '^IXIC',
+            'SSE': '000001.SS'
+        }
+        
+        result = {}
+        for name, ticker in tickers.items():
+            try:
+                stock = yf.Ticker(ticker)
+                hist = stock.history(period="1d")
+                
+                if not hist.empty:
+                    close = float(hist['Close'].iloc[-1])
+                    prev_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else close
+                    
+                    result[name.lower()] = {
+                        'price': round(close, 2),
+                        'percent': round(((close - prev_close) / prev_close) * 100, 2) if prev_close else 0
+                    }
+            except Exception as e:
+                print(f"Error fetching {name}: {e}")
+        
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/fx-rates')
 def fx_rates():
+    """獲取外匯匯率數據 - 返回與市場頁面兼容的格式"""
     try:
-        return jsonify({
-            "usd": {"price": 7.82, "change": "+0.01%"},
-            "eur": {"price": 8.50, "change": "-0.02%"},
-            "gbp": {"price": 9.90, "change": "+0.03%"}
-        })
+        import yfinance as yf
+        
+        currencies = {
+            'USD': 'USDHKD=X',
+            'EUR': 'EURHKD=X',
+            'GBP': 'GBPHKD=X',
+            'JPY': 'JPYHKD=X',
+            'CNY': 'CNYHKD=X'
+        }
+        
+        result = {}
+        for name, ticker in currencies.items():
+            try:
+                pair = yf.Ticker(ticker)
+                hist = pair.history(period="1d")
+                
+                if not hist.empty:
+                    close = float(hist['Close'].iloc[-1])
+                    prev_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else close
+                    
+                    result[name.lower()] = {
+                        'price': round(close, 2),
+                        'percent': round(((close - prev_close) / prev_close) * 100, 2) if prev_close else 0
+                    }
+            except Exception as e:
+                print(f"Error fetching {name}: {e}")
+        
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -47,12 +92,7 @@ def index():
     return jsonify({
         "message": "SHCB Market Data API",
         "version": "1.0.0",
-        "endpoints": [
-            "/api/stocks",
-            "/api/fx-rates",
-            "/health"
-        ]
+        "endpoints": ["/api/stocks", "/api/fx-rates", "/health"]
     })
 
-# WSGI 入口
 application = app
