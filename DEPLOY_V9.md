@@ -1,3 +1,17 @@
+# 部署版本 7 - 使用虛擬環境 Python
+
+## 請在 PythonAnywhere Bash 控制台執行：
+
+```bash
+# 1. 拉取最新代碼
+cd /home/chanpuirider/szcb-market-api
+git pull
+
+# 2. 激活虛擬環境
+source venv/bin/activate
+
+# 3. 替換 wsgi.py
+cat > wsgi.py << 'ENDOFFILE'
 import sys
 import os
 
@@ -127,3 +141,30 @@ def index():
     return jsonify({"message": "SHCB Market Data API v4.3"})
 
 application = app
+ENDOFFILE
+
+# 4. 替換 PythonAnywhere WSGI（關鍵：使用虛擬環境的 Python）
+cat > /var/www/chanpuirider_pythonanywhere_com_wsgi.py << 'ENDOFFILE'
+#!/home/chanpuirider/szcb-market-api/venv/bin/python3
+import sys
+import os
+
+# 設置虛擬環境路徑
+sys.path.insert(0, '/home/chanpuirider/szcb-market-api')
+os.chdir('/home/chanpuirider/szcb-market-api')
+
+# 導入 wsgi 模塊
+from wsgi import application
+ENDOFFILE
+
+# 5. 測試
+curl -s https://chanpuirider.pythonanywhere.com/debug
+```
+
+## 關鍵修改：
+1. wsgi.py 添加了 `sys.executable` 和 `yf.__file__` 來確認使用的是正確的 Python
+2. PythonAnywhere WSGI 文件添加了 shebang 指向虛擬環境 Python
+
+## 然後：
+1. 在 **Web** 頁面點擊 **Reload**
+2. 測試：http://localhost:9091/market.html

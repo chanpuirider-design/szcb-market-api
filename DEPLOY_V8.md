@@ -1,26 +1,38 @@
+# 部署版本 6 - 詳細錯誤追蹤
+
+## 請在 PythonAnywhere Bash 控制台執行：
+
+```bash
+# 1. 拉取最新代碼
+cd /home/chanpuirider/szcb-market-api
+git pull
+
+# 2. 激活虛擬環境
+source venv/bin/activate
+
+# 3. 替換 wsgi.py
+cat > wsgi.py << 'ENDOFFILE'
 import sys
 import os
+from flask import Flask, jsonify, make_response
+import traceback
 
-# 確保使用虛擬環境
 APP_DIR = '/home/chanpuirider/szcb-market-api'
 sys.path.insert(0, APP_DIR)
 os.chdir(APP_DIR)
 
-print(f"[INIT] Python: {sys.executable}", file=sys.stderr)
-print(f"[INIT] Version: {sys.version}", file=sys.stderr)
-print(f"[INIT] CWD: {os.getcwd()}", file=sys.stderr)
+app = Flask(__name__)
 
-# 測試 yfinance
+print(f"[START] Python: {sys.version}", file=sys.stderr)
+print(f"[START] CWD: {os.getcwd()}", file=sys.stderr)
+
 try:
     import yfinance as yf
-    print(f"[OK] yfinance {yf.__version__} from: {yf.__file__}", file=sys.stderr)
+    print(f"[OK] yfinance imported: {yf.__version__}", file=sys.stderr)
 except Exception as e:
     print(f"[ERROR] yfinance import failed: {e}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
     yf = None
-
-from flask import Flask, jsonify, make_response
-
-app = Flask(__name__)
 
 STOCK_TICKERS = {
     "hsi": "^HSI",
@@ -103,10 +115,8 @@ def health():
 def debug():
     global yf
     results = {
-        "python_executable": sys.executable,
         "python_version": sys.version,
         "yfinance_imported": yf is not None,
-        "yfinance_path": getattr(yf, '__file__', 'unknown'),
         "test_results": {}
     }
     if yf is not None:
@@ -124,6 +134,28 @@ def debug():
 
 @app.route('/')
 def index():
-    return jsonify({"message": "SHCB Market Data API v4.3"})
+    return jsonify({"message": "SHCB Market Data API v4.2"})
 
 application = app
+ENDOFFILE
+
+# 4. 替換 PythonAnywhere WSGI
+cat > /var/www/chanpuirider_pythonanywhere_com_wsgi.py << 'ENDOFFILE'
+import sys
+import os
+
+APP_DIR = '/home/chanpuirider/szcb-market-api'
+sys.path.insert(0, APP_DIR)
+os.chdir(APP_DIR)
+
+from wsgi import application
+ENDOFFILE
+
+# 5. 測試
+curl -s https://chanpuirider.pythonanywhere.com/debug
+```
+
+## 然後：
+1. 在 **Web** 頁面點擊 **Reload**
+2. 檢查 PythonAnywhere **錯誤日誌**（看到 [ERROR] 訊息）
+3. 測試：http://localhost:9091/market.html
