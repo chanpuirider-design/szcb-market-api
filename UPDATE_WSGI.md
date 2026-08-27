@@ -1,3 +1,16 @@
+# PythonAnywhere API 更新指令
+
+## 步驟 1: 在 Bash 控制台執行
+
+```bash
+# 進入應用目錄
+cd /home/chanpuirider/szcb-market-api
+
+# 拉取最新代碼
+git pull
+
+# 替換 wsgi.py
+cat > wsgi.py << 'EOF'
 """
 SHCB Market Data API - PythonAnywhere WSGI 配置
 返回與 market.html 兼容的數據格式
@@ -102,3 +115,32 @@ def index():
     })
 
 application = app
+EOF
+
+# 替換 PythonAnywhere 的 WSGI 文件
+cat > /var/www/chanpuirider_pythonanywhere_com_wsgi.py << 'EOF'
+import sys
+import os
+from flask import Flask, jsonify
+
+APP_DIR = '/home/chanpuirider/szcb-market-api'
+sys.path.insert(0, APP_DIR)
+os.chdir(APP_DIR)
+
+from wsgi import application
+EOF
+
+# 驗證
+cat /var/www/chanpuirider_pythonanywhere_com_wsgi.py
+
+# 測試
+curl -s https://chanpuirider.pythonanywhere.com/api/stocks
+curl -s https://chanpuirider.pythonanywhere.com/api/fx-rates
+```
+
+## 步驟 2: 在 Web 頁面點擊 Reload
+
+## 步驟 3: 測試市場頁面
+http://localhost:9091/market.html
+或
+https://dropout-poet-angler.ngrok-free.dev/market.html
