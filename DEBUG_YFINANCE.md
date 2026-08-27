@@ -1,3 +1,44 @@
+# PythonAnywhere yfinance 錯誤修復指南
+
+## 問題
+API 返回空對象 `{}`，可能是因為 yfinance 沒有正確安裝或網絡問題。
+
+## 解決方案
+
+### 步驟 1: 檢查 yfinance 是否安裝
+```bash
+cd /home/chanpuirider/szcb-market-api
+source venv/bin/activate
+pip list | grep yfinance
+```
+
+如果沒有安裝，執行：
+```bash
+pip install yfinance
+```
+
+### 步驟 2: 測試 yfinance
+```bash
+python -c "
+import yfinance as yf
+t = yf.Ticker('^HSI')
+h = t.history(period='1d')
+print(h)
+print('Price:', h['Close'].iloc[-1] if not h.empty else 'No data')
+"
+```
+
+### 步驟 3: 查看錯誤日誌
+```bash
+tail -50 /home/chanpuirider/.pythonanywhere.log
+tail -50 /home/chanpuirider/logs/error.log
+```
+
+### 步驟 4: 如果 yfinance 失敗，使用備用方案
+
+編輯 wsgi.py，使用簡單的硬編碼數據作為備用：
+```bash
+cat > /home/chanpuirider/szcb-market-api/wsgi.py << 'EOF'
 import sys
 import os
 from flask import Flask, jsonify
@@ -55,7 +96,7 @@ def stocks():
         
         # 如果 yfinance 失敗，使用備用數據
         if not success:
-            print("Using fallback stock data")
+            print("Using fallback data")
             return jsonify(STOCK_DATA)
         
         return jsonify(result)
@@ -108,3 +149,28 @@ def index():
     return jsonify({"message": "SHCB Market Data API", "version": "1.0.0"})
 
 application = app
+EOF
+```
+
+### 步驟 5: 更新 PythonAnywhere WSGI
+```bash
+cat > /var/www/chanpuirider_pythonanywhere_com_wsgi.py << 'EOF'
+import sys
+import os
+
+APP_DIR = '/home/chanpuirider/szcb-market-api'
+sys.path.insert(0, APP_DIR)
+os.chdir(APP_DIR)
+
+from wsgi import application
+EOF
+```
+
+### 步驟 6: 重新載入
+在 Web 頁面點擊 **Reload**
+
+### 步驟 7: 測試
+```bash
+curl -s https://chanpuirider.pythonanywhere.com/api/stocks
+curl -s https://chanpuirider.pythonanywhere.com/api/fx-rates
+```
