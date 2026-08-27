@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import json
 import urllib.request
 import urllib.error
@@ -16,7 +17,7 @@ def fetch_yahoo_data(symbol, period="5d"):
     """直接使用 Yahoo Finance API 獲取數據"""
     try:
         # Yahoo Finance API endpoint
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={int(os.time())-86400*2}&period2={int(os.time())}&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={int(time.time())-86400*2}&period2={int(time.time())}&interval=1d"
         
         req = urllib.request.Request(
             url,
