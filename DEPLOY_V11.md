@@ -1,6 +1,21 @@
+# 部署版本 9 - 直接使用 Yahoo Finance API
+
+## 請在 PythonAnywhere Bash 控制台執行：
+
+```bash
+# 1. 拉取最新代碼
+cd /home/chanpuirider/szcb-market-api
+git pull
+
+# 2. 激活虛擬環境
+source venv/bin/activate
+
+# 3. 替換 wsgi.py（不使用 yfinance，直接使用 Yahoo API）
+cat > wsgi.py << 'ENDOFFILE'
 import sys
 import os
 import json
+import time
 import urllib.request
 import urllib.error
 from flask import Flask, jsonify, make_response
@@ -11,12 +26,12 @@ os.chdir(APP_DIR)
 
 app = Flask(__name__)
 
-# 直接使用 Yahoo Finance API
-def fetch_yahoo_data(symbol, period="5d"):
+def fetch_yahoo_data(symbol):
     """直接使用 Yahoo Finance API 獲取數據"""
     try:
-        # Yahoo Finance API endpoint
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={int(os.time())-86400*2}&period2={int(os.time())}&interval=1d"
+        # 計算時間戳
+        now = int(time.time())
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={now-172800}&period2={now}&interval=1d"
         
         req = urllib.request.Request(
             url,
@@ -30,10 +45,7 @@ def fetch_yahoo_data(symbol, period="5d"):
             
             if 'chart' in data and data['chart']['result']:
                 result = data['chart']['result'][0]
-                timestamps = result['timestamp']
                 closes = result['indicators']['quote'][0]['close']
-                
-                # 過濾掉 None 值
                 closes = [c for c in closes if c is not None]
                 
                 if len(closes) >= 2:
@@ -41,8 +53,8 @@ def fetch_yahoo_data(symbol, period="5d"):
                     prev_close = closes[-2]
                     percent = ((current - prev_close) / prev_close) * 100
                     return {
-                        "price": round(current, 3),
-                        "previous_close": round(prev_close, 3),
+                        "price": round(current, 2),
+                        "previous_close": round(prev_close, 2),
                         "percent": round(percent, 2)
                     }
     except Exception as e:
@@ -50,7 +62,6 @@ def fetch_yahoo_data(symbol, period="5d"):
     
     return None
 
-# 股票代碼
 STOCK_TICKERS = {
     "hsi": "^HSI",
     "dji": "^DJI",
@@ -59,7 +70,6 @@ STOCK_TICKERS = {
     "sse": "000001.SS"
 }
 
-# 外匯代碼
 FX_TICKERS = {
     "usd": "USDHKD=X",
     "eur": "EURHKD=X",
@@ -69,27 +79,21 @@ FX_TICKERS = {
 }
 
 def get_stock_data():
-    """獲取股票數據"""
     data = {}
     for key, symbol in STOCK_TICKERS.items():
         result = fetch_yahoo_data(symbol)
         if result:
             data[key] = result
             print(f"[OK] {key}: {result['price']}", file=sys.stderr)
-        else:
-            print(f"[WARN] {key}: 無法獲取數據", file=sys.stderr)
     return data
 
 def get_fx_data():
-    """獲取外匯數據"""
     data = {}
     for key, symbol in FX_TICKERS.items():
         result = fetch_yahoo_data(symbol)
         if result:
             data[key] = result
             print(f"[OK] {key}: {result['price']}", file=sys.stderr)
-        else:
-            print(f"[WARN] {key}: 無法獲取數據", file=sys.stderr)
     return data
 
 @app.after_request
@@ -119,19 +123,13 @@ def health():
 
 @app.route('/debug')
 def debug():
-    results = {
-        "python_version": sys.version,
-        "test_results": {}
-    }
-    
-    # 測試 Yahoo API
+    results = {"python_version": sys.version, "test_results": {}}
     for symbol in ["^HSI", "USDHKD=X", "^DJI"]:
         try:
             result = fetch_yahoo_data(symbol)
             results["test_results"][symbol] = result
         except Exception as e:
             results["test_results"][symbol] = {"error": str(e)}
-    
     return jsonify(results)
 
 @app.route('/')
@@ -139,3 +137,30 @@ def index():
     return jsonify({"message": "SHCB Market Data API v5.0", "data_source": "Yahoo Finance API"})
 
 application = app
+ENDOFFILE
+
+# 4. 替換 PythonAnywhere WSGI
+cat > /var/www/chanpuirider_pythonanywhere_com_wsgi.py << 'ENDOFFILE'
+import sys
+import os
+
+APP_DIR = '/home/chanpuirider/szcb-market-api'
+sys.path.insert(0, APP_DIR)
+os.chdir(APP_DIR)
+
+from wsgi import application
+ENDOFFILE
+
+# 5. 測試
+curl -s https://chanpuirider.pythonanywhere.com/debug
+curl -s https://chanpuirider.pythonanywhere.com/api/stocks
+curl -s https://chanpuirider.pythonanywhere.com/api/fx-rates
+```
+
+## 然後：
+1. 在 **Web** 頁面點擊 **Reload**
+2. 測試：http://localhost:9091/market.html
+
+## 注意：
+- 此版本不使用 yfinance，直接使用 Yahoo Finance API
+- 如果仍然失敗，可能是 PythonAnywhere 網絡限制
