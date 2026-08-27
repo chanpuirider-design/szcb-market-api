@@ -1,8 +1,6 @@
 import sys
 import os
 from flask import Flask, jsonify
-import random
-from datetime import datetime
 
 APP_DIR = '/home/chanpuirider/szcb-market-api'
 sys.path.insert(0, APP_DIR)
@@ -10,94 +8,30 @@ os.chdir(APP_DIR)
 
 app = Flask(__name__)
 
-# 備用數據（當 yfinance 失敗時使用）
+# 簡單的硬編碼數據 - 立即返回
 STOCK_DATA = {
-    'hsi': {'price': 22500.50, 'previous_close': 22230.00, 'percent': 1.22},
-    'dji': {'price': 38000.00, 'previous_close': 37700.00, 'percent': 0.80},
-    'spx': {'price': 5200.00, 'previous_close': 5175.00, 'percent': 0.48},
-    'ixic': {'price': 16500.00, 'previous_close': 16350.00, 'percent': 0.92},
-    'sse': {'price': 3200.00, 'previous_close': 3190.00, 'percent': 0.31}
+    "hsi": {"price": 22500.50, "previous_close": 22230.00, "percent": 1.22},
+    "dji": {"price": 38000.00, "previous_close": 37700.00, "percent": 0.80},
+    "spx": {"price": 5200.00, "previous_close": 5175.00, "percent": 0.48},
+    "ixic": {"price": 16500.00, "previous_close": 16350.00, "percent": 0.92},
+    "sse": {"price": 3200.00, "previous_close": 3190.00, "percent": 0.31}
 }
 
 FX_DATA = {
-    'usd': {'price': 7.82, 'previous_close': 7.81, 'percent': 0.13},
-    'eur': {'price': 8.50, 'previous_close': 8.48, 'percent': 0.24},
-    'gbp': {'price': 9.90, 'previous_close': 9.88, 'percent': 0.20},
-    'jpy': {'price': 0.0521, 'previous_close': 0.0520, 'percent': 0.19},
-    'cny': {'price': 1.07, 'previous_close': 1.07, 'percent': 0.00}
+    "usd": {"price": 7.82, "previous_close": 7.81, "percent": 0.13},
+    "eur": {"price": 8.50, "previous_close": 8.48, "percent": 0.24},
+    "gbp": {"price": 9.90, "previous_close": 9.88, "percent": 0.20},
+    "jpy": {"price": 0.0521, "previous_close": 0.0520, "percent": 0.19},
+    "cny": {"price": 1.07, "previous_close": 1.07, "percent": 0.00}
 }
 
 @app.route('/api/stocks')
 def stocks():
-    """獲取股票指數數據"""
-    try:
-        # 嘗試使用 yfinance
-        import yfinance as yf
-        tickers = {'HSI': '^HSI', 'DJI': '^DJI', 'SPX': '^GSPC', 'IXIC': '^IXIC', 'SSE': '000001.SS'}
-        result = {}
-        success = False
-        
-        for name, ticker in tickers.items():
-            try:
-                stock = yf.Ticker(ticker)
-                hist = stock.history(period="1d")
-                if not hist.empty:
-                    close = float(hist['Close'].iloc[-1])
-                    prev_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else close
-                    result[name.lower()] = {
-                        'price': round(close, 2),
-                        'previous_close': round(prev_close, 2),
-                        'percent': round(((close - prev_close) / prev_close) * 100, 2) if prev_close else 0
-                    }
-                    success = True
-            except Exception as e:
-                print(f"Error fetching {name}: {e}")
-        
-        # 如果 yfinance 失敗，使用備用數據
-        if not success:
-            print("Using fallback stock data")
-            return jsonify(STOCK_DATA)
-        
-        return jsonify(result)
-    except Exception as e:
-        print(f"Error in stocks: {e}")
-        return jsonify(STOCK_DATA)
+    return jsonify(STOCK_DATA)
 
 @app.route('/api/fx-rates')
 def fx_rates():
-    """獲取外匯匯率數據"""
-    try:
-        # 嘗試使用 yfinance
-        import yfinance as yf
-        currencies = {'USD': 'USDHKD=X', 'EUR': 'EURHKD=X', 'GBP': 'GBPHKD=X', 'JPY': 'JPYHKD=X', 'CNY': 'CNYHKD=X'}
-        result = {}
-        success = False
-        
-        for name, ticker in currencies.items():
-            try:
-                pair = yf.Ticker(ticker)
-                hist = pair.history(period="1d")
-                if not hist.empty:
-                    close = float(hist['Close'].iloc[-1])
-                    prev_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else close
-                    result[name.lower()] = {
-                        'price': round(close, 2),
-                        'previous_close': round(prev_close, 2),
-                        'percent': round(((close - prev_close) / prev_close) * 100, 2) if prev_close else 0
-                    }
-                    success = True
-            except Exception as e:
-                print(f"Error fetching {name}: {e}")
-        
-        # 如果 yfinance 失敗，使用備用數據
-        if not success:
-            print("Using fallback FX data")
-            return jsonify(FX_DATA)
-        
-        return jsonify(result)
-    except Exception as e:
-        print(f"Error in fx_rates: {e}")
-        return jsonify(FX_DATA)
+    return jsonify(FX_DATA)
 
 @app.route('/health')
 def health():
