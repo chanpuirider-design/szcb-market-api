@@ -27,45 +27,75 @@ FX_TICKERS = {
 }
 
 def get_stock_data():
-    """只返回 yfinance 真實數據，失敗則返回空"""
+    """獲取股票數據"""
     import yfinance as yf
     data = {}
+    errors = []
+    
     for key, ticker in STOCK_TICKERS.items():
         try:
             stock = yf.Ticker(ticker)
             hist = stock.history(period="2d")
-            if not hist.empty and len(hist) >= 2:
-                current = hist['Close'].iloc[-1]
-                prev_close = hist['Close'].iloc[-2]
-                percent = ((current - prev_close) / prev_close) * 100
-                data[key] = {
-                    "price": round(current, 2),
-                    "previous_close": round(prev_close, 2),
-                    "percent": round(percent, 2)
-                }
+            
+            if hist.empty:
+                errors.append(f"{key} ({ticker}): 無數據")
+                continue
+                
+            if len(hist) < 2:
+                errors.append(f"{key} ({ticker}): 數據不足")
+                continue
+            
+            current = hist['Close'].iloc[-1]
+            prev_close = hist['Close'].iloc[-2]
+            percent = ((current - prev_close) / prev_close) * 100
+            
+            data[key] = {
+                "price": round(current, 2),
+                "previous_close": round(prev_close, 2),
+                "percent": round(percent, 2)
+            }
         except Exception as e:
-            pass
+            errors.append(f"{key} ({ticker}): {str(e)}")
+    
+    if errors:
+        print(f"[DEBUG] Errors: {errors}", file=sys.stderr)
+    
     return data
 
 def get_fx_data():
-    """只返回 yfinance 真實數據，失敗則返回空"""
+    """獲取外匯數據"""
     import yfinance as yf
     data = {}
+    errors = []
+    
     for key, ticker in FX_TICKERS.items():
         try:
             forex = yf.Ticker(ticker)
             hist = forex.history(period="2d")
-            if not hist.empty and len(hist) >= 2:
-                current = hist['Close'].iloc[-1]
-                prev_close = hist['Close'].iloc[-2]
-                percent = ((current - prev_close) / prev_close) * 100
-                data[key] = {
-                    "price": round(current, 4),
-                    "previous_close": round(prev_close, 4),
-                    "percent": round(percent, 2)
-                }
+            
+            if hist.empty:
+                errors.append(f"{key} ({ticker}): 無數據")
+                continue
+                
+            if len(hist) < 2:
+                errors.append(f"{key} ({ticker}): 數據不足")
+                continue
+            
+            current = hist['Close'].iloc[-1]
+            prev_close = hist['Close'].iloc[-2]
+            percent = ((current - prev_close) / prev_close) * 100
+            
+            data[key] = {
+                "price": round(current, 4),
+                "previous_close": round(prev_close, 4),
+                "percent": round(percent, 2)
+            }
         except Exception as e:
-            pass
+            errors.append(f"{key} ({ticker}): {str(e)}")
+    
+    if errors:
+        print(f"[DEBUG] FX Errors: {errors}", file=sys.stderr)
+    
     return data
 
 @app.after_request
@@ -79,19 +109,40 @@ def add_cors_headers(response):
 def stocks():
     data = get_stock_data()
     if not data:
-        return jsonify({"error": "無法獲取股票數據"}), 503
+        return jsonify({"error": "無法獲取股票數據", "debug": "檢查日誌"}), 503
     return jsonify(data)
 
 @app.route('/api/fx-rates')
 def fx_rates():
     data = get_fx_data()
     if not data:
-        return jsonify({"error": "無法獲取外匯數據"}), 503
+        return jsonify({"error": "無法獲取外匯數據", "debug": "檢查日誌"}), 503
     return jsonify(data)
 
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy", "service": "shcb-market-api", "data_source": "yfinance"})
+
+@app.route('/debug')
+def debug():
+    """調試端點"""
+    import yfinance as yf
+    results = {}
+    
+    # 測試单个 ticker
+    try:
+        t = yf.Ticker("^HSI")
+        h = t.history(period="2d")
+        results["HSI_test"] = {
+            "has_data": not h.empty,
+            "rows": len(h),
+            "columns": list(h.columns),
+            "last_price": float(h['Close'].iloc[-1]) if not h.empty else None
+        }
+    except Exception as e:
+        results["HSI_test"] = {"error": str(e)}
+    
+    return jsonify(results)
 
 @app.route('/')
 def index():
