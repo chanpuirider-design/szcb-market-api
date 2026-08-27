@@ -1,8 +1,13 @@
+"""
+SHCB Market Data API - 簡單 Flask 包裝器
+為 PythonAnywhere WSGI 兼容而設計
+"""
+
 import sys
 import os
-from flask import Flask, Response, jsonify, request as flask_request
+from flask import Flask, jsonify
 
-# 配置應用目錄
+# 應用目錄
 APP_DIR = '/home/chanpuirider/szcb-market-api'
 sys.path.insert(0, APP_DIR)
 os.chdir(APP_DIR)
@@ -10,42 +15,39 @@ os.chdir(APP_DIR)
 # 創建 Flask 應用
 app = Flask(__name__)
 
-# 導入 FastAPI 應用和函數
-from main import app as fastapi_app
+# 導入 FastAPI 函數
 from main import get_stock_data, get_fx_rates, health_check
 
-# 註冊路由
+# 路由定義
 @app.route('/api/stocks')
+def api_stocks():
+    """獲取股票數據"""
+    return jsonify(get_stock_data())
+
 @app.route('/api/fx-rates')
+def api_fx_rates():
+    """獲取匯率數據"""
+    return jsonify(get_fx_rates())
+
 @app.route('/health')
+def api_health():
+    """健康檢查"""
+    return jsonify(health_check())
+
 @app.route('/')
 @app.route('/docs')
 @app.route('/redoc')
-def handle_api():
-    path = flask_request.path
-    
-    if path == '/api/stocks':
-        data = get_stock_data()
-        return jsonify(data)
-    elif path == '/api/fx-rates':
-        data = get_fx_rates()
-        return jsonify(data)
-    elif path == '/health':
-        data = health_check()
-        return jsonify(data)
-    elif path in ['/docs', '/redoc']:
-        return Response(
-            '<html><body><h1>API Documentation</h1><p>Use the <code>GET</code> endpoints:</p>'
-            '<ul><li><a href="/api/stocks">/api/stocks</a></li>'
-            '<li><a href="/api/fx-rates">/api/fx-rates</a></li></ul></body></html>',
-            mimetype='text/html'
-        )
-    else:
-        return jsonify({
-            "message": "SHCB Market Data API",
-            "version": "1.0.0",
-            "endpoints": ["/api/stocks", "/api/fx-rates", "/health"]
-        })
+def api_index():
+    """API 首頁"""
+    return jsonify({
+        "message": "SHCB Market Data API",
+        "version": "1.0.0",
+        "endpoints": [
+            "/api/stocks",
+            "/api/fx-rates",
+            "/health"
+        ]
+    })
 
-# WSGI 入口
+# WSGI 入口點
 application = app
